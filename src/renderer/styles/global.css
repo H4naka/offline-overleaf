@@ -1,0 +1,34 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-bg:          #1e1e2e;
+  --color-surface:     #181825;
+  --color-toolbar:     #11111b;
+  --color-border:      #313244;
+  --color-text:        #cdd6f4;
+  --color-text-muted:  #6c7086;
+  --color-accent:      #89b4fa;
+  --color-error:       #f38ba8;
+  --color-success:     #a6e3a1;
+  --font-ui:   system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  --toolbar-height: 44px;
+  --spacing-sm: 6px;
+  --spacing-md: 12px;
+  --radius: 6px;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}

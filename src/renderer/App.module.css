@@ -1,0 +1,44 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.workspace {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.editorPane {
+  flex: 1;
+  overflow: hidden;
+  background: var(--color-surface);
+  position: relative;
+}
+
+.editorEmpty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  text-align: center;
+  pointer-events: none;
+}
+
+.divider {
+  width: 4px;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+
+.pdfPane {
+  flex: 1;
+  overflow: hidden;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+}

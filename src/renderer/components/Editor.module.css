@@ -1,0 +1,9 @@
+.editor {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Make CM6's own container fill the host div */
+.editor :global(.cm-editor) {
+  height: 100%;
+}
