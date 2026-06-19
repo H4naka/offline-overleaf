@@ -1,9 +1,20 @@
-import { useEffect, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { EditorView, basicSetup } from 'codemirror'
-import { EditorState } from '@codemirror/state'
+import { EditorSelection, EditorState } from '@codemirror/state'
 import { StreamLanguage } from '@codemirror/language'
 import { stex } from '@codemirror/legacy-modes/mode/stex'
 import styles from './Editor.module.css'
+
+export interface ViewState {
+  anchor: number
+  head: number
+  scrollTop: number
+}
+
+export interface EditorHandle {
+  getViewState(): ViewState | null
+  applyViewState(vs: ViewState): void
+}
 
 interface Props {
   value: string
@@ -60,14 +71,49 @@ const theme = EditorView.theme(
   { dark: true },
 )
 
-export function Editor({ value, onChange }: Props) {
+export const Editor = forwardRef<EditorHandle, Props>(function Editor(
+  { value, onChange },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const viewRef = useRef<EditorView | null>(null)
-  const onChangeRef = useRef(onChange)
+  const viewRef      = useRef<EditorView | null>(null)
+  const onChangeRef  = useRef(onChange)
   onChangeRef.current = onChange
 
   const internalValueRef = useRef(value)
 
+  useImperativeHandle(ref, () => ({
+    getViewState() {
+      const view = viewRef.current
+      if (!view) return null
+      const { main } = view.state.selection
+      return { anchor: main.anchor, head: main.head, scrollTop: view.scrollDOM.scrollTop }
+    },
+
+    applyViewState(vs: ViewState) {
+      const view = viewRef.current
+      if (!view) return
+      const docLen = view.state.doc.length
+      view.dispatch({
+        selection: EditorSelection.create([
+          EditorSelection.range(
+            Math.min(vs.anchor, docLen),
+            Math.min(vs.head,   docLen),
+          ),
+        ]),
+      })
+      // Double-rAF: runs after CM6's own rAF-scheduled scroll-into-view so our
+      // saved scroll position wins.
+      const { scrollTop } = vs
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (viewRef.current) viewRef.current.scrollDOM.scrollTop = scrollTop
+        })
+      })
+    },
+  }), [])
+
+  // Create the view once; it survives all re-renders
   useEffect(() => {
     if (!containerRef.current) return
 
@@ -95,11 +141,10 @@ export function Editor({ value, onChange }: Props) {
       view.destroy()
       viewRef.current = null
     }
-    // Intentionally empty: view is created once and survives re-renders
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Sync external value changes (e.g. new file opened) without re-creating the view
+  // Sync externally-driven content changes (new file opened) without rebuilding the view
   useEffect(() => {
     const view = viewRef.current
     if (!view || value === internalValueRef.current) return
@@ -110,4 +155,4 @@ export function Editor({ value, onChange }: Props) {
   }, [value])
 
   return <div ref={containerRef} className={styles.editor} />
-}
+})

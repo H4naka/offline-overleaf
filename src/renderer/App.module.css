@@ -11,11 +11,29 @@
   overflow: hidden;
 }
 
+/* ── sidebar ── */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+}
+
+.sidebarDivider {
+  width: 1px;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+
+/* ── editor ── */
 .editorPane {
   flex: 1;
   overflow: hidden;
   background: var(--color-surface);
   position: relative;
+  min-width: 0;
 }
 
 .editorEmpty {
@@ -29,16 +47,34 @@
   pointer-events: none;
 }
 
+/* ── center divider ── */
 .divider {
   width: 4px;
   background: var(--color-border);
   flex-shrink: 0;
 }
 
+/* ── pdf pane ── */
 .pdfPane {
   flex: 1;
   overflow: hidden;
   background: var(--color-bg);
   display: flex;
   flex-direction: column;
+  min-width: 0;
+}
+
+/* ── no-target banner ── */
+.noTargetBanner {
+  padding: 6px 16px;
+  background: color-mix(in srgb, var(--color-warning, #f9e2af) 10%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--color-warning, #f9e2af) 30%, transparent);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.noTargetBanner em {
+  font-style: normal;
+  color: var(--color-text);
 }

@@ -15,4 +15,34 @@ contextBridge.exposeInMainWorld('api', {
     read: (pdfPath: string) =>
       ipcRenderer.invoke('pdf:read', pdfPath),
   },
+  fs: {
+    readDir:    (dirPath: string) =>
+      ipcRenderer.invoke('fs:readDir', dirPath),
+    readFile:   (filePath: string) =>
+      ipcRenderer.invoke('fs:readFile', filePath),
+    createFile: (filePath: string) =>
+      ipcRenderer.invoke('fs:createFile', filePath),
+    createDir:  (dirPath: string) =>
+      ipcRenderer.invoke('fs:createDir', dirPath),
+    rename:     (oldPath: string, newPath: string) =>
+      ipcRenderer.invoke('fs:rename', oldPath, newPath),
+    delete:     (entryPath: string) =>
+      ipcRenderer.invoke('fs:delete', entryPath),
+  },
+  dialog: {
+    confirm: (title: string, message: string) =>
+      ipcRenderer.invoke('dialog:confirm', title, message) as Promise<boolean>,
+  },
+  config: {
+    getProject:  (rootDir: string) =>
+      ipcRenderer.invoke('config:getProject', rootDir),
+    setMain:     (rootDir: string, absPath: string) =>
+      ipcRenderer.invoke('config:setMain', rootDir, absPath),
+    setLastOpen: (rootDir: string, absPath: string) =>
+      ipcRenderer.invoke('config:setLastOpen', rootDir, absPath),
+  },
+  app: {
+    getStartupState: () =>
+      ipcRenderer.invoke('app:getStartupState'),
+  },
 })
