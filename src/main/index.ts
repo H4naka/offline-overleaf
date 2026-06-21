@@ -22,7 +22,14 @@ function createWindow(): void {
   })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    const devUrl = process.env['ELECTRON_RENDERER_URL']
+    win.loadURL(devUrl)
+    // Safety net: if the initial load fails (e.g., Vite's optimizer hasn't
+    // finished yet on a cold first run), retry once after a short delay.
+    // Error code -3 (ERR_ABORTED) is a normal redirect/reload, not a failure.
+    win.webContents.once('did-fail-load', (_e, errorCode) => {
+      if (errorCode !== -3) setTimeout(() => win.loadURL(devUrl), 1500)
+    })
   } else {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
