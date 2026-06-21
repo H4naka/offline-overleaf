@@ -46,6 +46,16 @@ export function App() {
   // Ref to the CM6 editor instance; used to read and restore view state.
   const editorRef = useRef<EditorHandle>(null)
 
+  // ── SyncTeX state ──────────────────────────────────────────────────────────
+  const [forwardTarget, setForwardTarget] = useState<SyncForwardTarget | null>(null)
+  // Updated after every successful compile; not reactive state because
+  // handleForwardSearch is a stable callback that reads it via ref.
+  const synctexPathRef    = useRef<string | null>(null)
+  const forwardKeyCounter = useRef(0)
+  // When reverse search navigates to a different file, we set this so the
+  // cursor-restore effect can call goToLine after the Editor re-renders.
+  const pendingGoToLineRef = useRef<{ file: string; line: number } | null>(null)
+
   // ── directory refresh ──────────────────────────────────────────────────────
   const refreshEntries = useCallback(async () => {
     const dir = rootDirRef.current
@@ -270,12 +280,50 @@ export function App() {
     setMainTexFile(filePath)
   }, [])
 
+  // ── SyncTeX forward search (double-click in editor) ─────────────────────
+  const handleForwardSearch = useCallback(async () => {
+    const stx     = synctexPathRef.current
+    const texFile = openFilePathRef.current
+    if (!stx || !texFile) return
+    const line   = editorRef.current?.getCursorLine() ?? 1
+    const result = await window.api.synctex.forward(stx, texFile, line)
+    if (result.ok && result.data) {
+      setForwardTarget({
+        ...result.data,
+        key: ++forwardKeyCounter.current,
+      })
+    }
+  }, [])
+
+  // ── SyncTeX reverse search (double-click in PDF) ──────────────────────────
+  const handleReverseSearch = useCallback(async (file: string, line: number) => {
+    if (file === openFilePathRef.current) {
+      editorRef.current?.goToLine(line)
+    } else {
+      const r = await window.api.fs.readFile(file)
+      if (!r.ok || r.content === undefined) return
+      fileContentsRef.current[file] = r.content
+      pendingGoToLineRef.current = { file, line }
+      setOpenFilePath(file)
+      setOpenFileContent(r.content)
+      const dir = rootDirRef.current
+      if (dir) void window.api.config.setLastOpen(dir, file)
+    }
+  }, [])
+
   // ── cursor / scroll restoration ───────────────────────────────────────────
   // Runs after openFilePath changes. Because Editor is a child component, its
   // own useEffect (which sets the new content) runs first, so applyViewState
   // dispatches on the correct (already-replaced) document.
   useEffect(() => {
     if (!openFilePath) return
+    // Pending goToLine from a cross-file reverse search takes priority
+    const pending = pendingGoToLineRef.current
+    if (pending?.file === openFilePath) {
+      pendingGoToLineRef.current = null
+      editorRef.current?.goToLine(pending.line)
+      return
+    }
     const vs = viewStatesRef.current[openFilePath]
     if (vs) editorRef.current?.applyViewState(vs)
   }, [openFilePath])
@@ -304,6 +352,7 @@ export function App() {
 
     setCompile(prev => ({ ...prev, status: 'compiling' }))
     const result = await window.api.compiler.compile(target)
+    synctexPathRef.current = result.synctexPath ?? null
     setCompile(prev => ({
       status: result.ok ? 'success' : 'error',
       pdfPath: result.pdfPath,
@@ -347,7 +396,12 @@ export function App() {
 
         <div className={styles.editorPane}>
           {openFilePath ? (
-            <Editor ref={editorRef} value={openFileContent} onChange={handleContentChange} />
+            <Editor
+              ref={editorRef}
+              value={openFileContent}
+              onChange={handleContentChange}
+              onForwardSearch={handleForwardSearch}
+            />
           ) : (
             <div className={styles.editorEmpty}>
               <p>
@@ -368,6 +422,9 @@ export function App() {
             status={compile.status}
             errors={compile.errors}
             log={compile.log}
+            synctexPath={synctexPathRef.current ?? undefined}
+            forwardTarget={forwardTarget ?? undefined}
+            onReverseSearch={handleReverseSearch}
           />
         </div>
       </div>

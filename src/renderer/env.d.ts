@@ -10,8 +10,19 @@ interface FileEntry {
 interface CompileResult {
   ok: boolean
   pdfPath?: string
+  synctexPath?: string
   log: string
   errors: string[]
+}
+
+interface SyncForwardTarget {
+  page: number
+  h: number       // scaled points
+  v: number       // scaled points (baseline, from top of page)
+  width: number
+  height: number  // above baseline
+  depth: number   // below baseline
+  key: number     // monotonically increasing; forces highlight to replay
 }
 
 type IpcOk<T = undefined> = T extends undefined
@@ -50,6 +61,12 @@ interface Window {
     }
     app: {
       getStartupState: () => Promise<IpcResult<{ rootDir: string; mainTexFile: string | null; lastOpenFile: string | null } | null>>
+    }
+    synctex: {
+      forward: (synctexPath: string, texFile: string, line: number) =>
+        Promise<IpcResult<{ page: number; h: number; v: number; width: number; height: number; depth: number }>>
+      reverse: (synctexPath: string, page: number, h: number, v: number) =>
+        Promise<IpcResult<{ file: string; line: number }>>
     }
   }
 }

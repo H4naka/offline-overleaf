@@ -32,3 +32,34 @@ html, body, #root {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ── PDF.js text layer ───────────────────────────────────────────────────────
+   Transparent positioned spans rendered by TextLayer.render() that overlay
+   the canvas, enabling text selection and text cursor in the PDF preview.
+   z-index: 2 so it sits above the canvas; syncHighlight uses z-index: 3.  */
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 2;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  cursor: default;
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.textLayer ::selection {
+  background-color: rgba(100, 180, 255, 0.35);
+  color: transparent;
+}

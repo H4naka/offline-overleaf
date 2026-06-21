@@ -64,6 +64,7 @@
 }
 
 .pageWrapper {
+  position: relative;   /* anchor for the SyncTeX highlight overlay */
   box-shadow: 0 4px 28px rgba(0, 0, 0, 0.55);
   line-height: 0;
   flex-shrink: 0;
@@ -189,4 +190,36 @@
   white-space: pre-wrap;
   word-break: break-all;
   margin-top: 6px;
+}
+
+/* ── SyncTeX badge ── */
+.synctexBadge {
+  margin-left: var(--spacing-sm);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
+  cursor: default;
+}
+
+/* ── Forward-search highlight overlay ── */
+.syncHighlight {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: 3px;
+  box-sizing: border-box;
+  border: 2px solid rgba(249, 226, 175, 0.85);
+  background: rgba(249, 226, 175, 0.25);
+  animation: syncFlash 1.6s ease-out forwards;
+}
+
+@keyframes syncFlash {
+  0%   { opacity: 1; background: rgba(249, 226, 175, 0.45); }
+  25%  { opacity: 1; background: rgba(249, 226, 175, 0.25); }
+  100% { opacity: 0; background: rgba(249, 226, 175, 0.05); }
 }

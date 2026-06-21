@@ -7,6 +7,7 @@ import {
   renameEntry, deleteEntry, readTextFile,
 } from './fsOps'
 import { getProjectConfig, setMainTexFile, setLastOpenFile, getStartupState } from './appState'
+import { forwardSearch, reverseSearch } from './synctex'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -184,3 +185,29 @@ ipcMain.handle('app:getStartupState', async () => {
     return { ok: false, error: (e as Error).message }
   }
 })
+
+// ── SyncTeX ───────────────────────────────────────────────────────────────────
+
+ipcMain.handle('synctex:forward',
+  async (_e, synctexPath: string, texFile: string, line: number) => {
+    try {
+      const result = await forwardSearch(synctexPath, texFile, line)
+      return result
+        ? { ok: true,  data: result }
+        : { ok: false, error: 'No matching position found' }
+    } catch (e) {
+      return { ok: false, error: (e as Error).message }
+    }
+  })
+
+ipcMain.handle('synctex:reverse',
+  async (_e, synctexPath: string, page: number, h: number, v: number) => {
+    try {
+      const result = await reverseSearch(synctexPath, page, h, v)
+      return result
+        ? { ok: true,  data: result }
+        : { ok: false, error: 'No matching position found' }
+    } catch (e) {
+      return { ok: false, error: (e as Error).message }
+    }
+  })

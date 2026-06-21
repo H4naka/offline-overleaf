@@ -1,6 +1,7 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import { EditorView, basicSetup } from 'codemirror'
-import { EditorSelection, EditorState } from '@codemirror/state'
+import { EditorSelection, EditorState, StateField, StateEffect } from '@codemirror/state'
+import { Decoration, type DecorationSet } from '@codemirror/view'
 import { StreamLanguage } from '@codemirror/language'
 import { stex } from '@codemirror/legacy-modes/mode/stex'
 import styles from './Editor.module.css'
@@ -14,14 +15,43 @@ export interface ViewState {
 export interface EditorHandle {
   getViewState(): ViewState | null
   applyViewState(vs: ViewState): void
+  getCursorLine(): number
+  goToLine(line: number): void
 }
 
 interface Props {
   value: string
   onChange: (value: string) => void
+  onForwardSearch?: () => void
 }
 
 const latexLang = StreamLanguage.define(stex)
+
+// ── SyncTeX reverse-search line highlight ─────────────────────────────────────
+const setLineHighlight   = StateEffect.define<number>()  // 1-based line
+const clearLineHighlight = StateEffect.define<null>()
+
+const lineHighlightField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    deco = deco.map(tr.changes)
+    for (const e of tr.effects) {
+      if (e.is(setLineHighlight)) {
+        try {
+          const lineObj = tr.state.doc.line(e.value)
+          deco = Decoration.set([
+            Decoration.mark({ class: 'cm-synctex-line' })
+              .range(lineObj.from, lineObj.to || lineObj.from + 1),
+          ])
+        } catch { deco = Decoration.none }
+      } else if (e.is(clearLineHighlight)) {
+        deco = Decoration.none
+      }
+    }
+    return deco
+  },
+  provide: f => EditorView.decorations.from(f),
+})
 
 const theme = EditorView.theme(
   {
@@ -67,20 +97,35 @@ const theme = EditorView.theme(
       background: 'var(--color-surface)',
       border: '1px solid var(--color-border)',
     },
+    '.cm-synctex-line': {
+      background: 'color-mix(in srgb, #f9e2af 30%, transparent)',
+      borderRadius: '2px',
+    },
   },
   { dark: true },
 )
 
 export const Editor = forwardRef<EditorHandle, Props>(function Editor(
-  { value, onChange },
+  { value, onChange, onForwardSearch },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef      = useRef<EditorView | null>(null)
   const onChangeRef  = useRef(onChange)
   onChangeRef.current = onChange
+  const onForwardSearchRef = useRef(onForwardSearch)
+  onForwardSearchRef.current = onForwardSearch
 
   const internalValueRef = useRef(value)
+
+  // Double-click on editor → forward search. Created once; uses ref so it
+  // always sees the latest callback without being recreated.
+  // Return false so CM6 still performs its own word-selection on double-click.
+  const dblClickExtension = useMemo(() =>
+    EditorView.domEventHandlers({
+      dblclick: () => { onForwardSearchRef.current?.(); return false },
+    }),
+  [])
 
   useImperativeHandle(ref, () => ({
     getViewState() {
@@ -102,14 +147,38 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
           ),
         ]),
       })
-      // Double-rAF: runs after CM6's own rAF-scheduled scroll-into-view so our
-      // saved scroll position wins.
+      // Double-rAF: runs after CM6's own rAF-scheduled scroll-into-view
       const { scrollTop } = vs
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (viewRef.current) viewRef.current.scrollDOM.scrollTop = scrollTop
         })
       })
+    },
+
+    getCursorLine() {
+      const view = viewRef.current
+      if (!view) return 1
+      const pos = view.state.selection.main.head
+      return view.state.doc.lineAt(pos).number
+    },
+
+    goToLine(line: number) {
+      const view = viewRef.current
+      if (!view) return
+      const doc     = view.state.doc
+      const lineObj = doc.line(Math.max(1, Math.min(line, doc.lines)))
+      view.dispatch({
+        selection: { anchor: lineObj.from },
+        effects: [
+          EditorView.scrollIntoView(lineObj.from, { y: 'center' }),
+          setLineHighlight.of(line),
+        ],
+      })
+      view.focus()
+      setTimeout(() => {
+        viewRef.current?.dispatch({ effects: clearLineHighlight.of(null) })
+      }, 1500)
     },
   }), [])
 
@@ -124,6 +193,8 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
           basicSetup,
           latexLang,
           theme,
+          lineHighlightField,
+          dblClickExtension,
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
               const text = update.state.doc.toString()
@@ -144,7 +215,7 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Sync externally-driven content changes (new file opened) without rebuilding the view
+  // Sync externally-driven content changes (new file opened)
   useEffect(() => {
     const view = viewRef.current
     if (!view || value === internalValueRef.current) return

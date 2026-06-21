@@ -4,6 +4,7 @@ import { dirname, basename, join } from 'path'
 export interface CompileResult {
   ok: boolean
   pdfPath?: string
+  synctexPath?: string
   log: string
   errors: string[]
 }
@@ -28,10 +29,13 @@ export function compile(texFilePath: string): Promise<CompileResult> {
 
     proc.on('close', (code) => {
       const errors = extractErrors(log)
-      const pdfPath = join(dir, file.replace(/\.tex$/, '.pdf'))
+      const stem       = file.replace(/\.tex$/, '')
+      const pdfPath    = join(dir, stem + '.pdf')
+      const synctexPath = join(dir, stem + '.synctex.gz')
       resolve({
         ok: code === 0,
-        pdfPath: code === 0 ? pdfPath : undefined,
+        pdfPath:     code === 0 ? pdfPath     : undefined,
+        synctexPath: code === 0 ? synctexPath : undefined,
         log,
         errors,
       })

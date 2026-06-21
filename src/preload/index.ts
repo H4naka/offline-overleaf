@@ -45,4 +45,10 @@ contextBridge.exposeInMainWorld('api', {
     getStartupState: () =>
       ipcRenderer.invoke('app:getStartupState'),
   },
+  synctex: {
+    forward: (synctexPath: string, texFile: string, line: number) =>
+      ipcRenderer.invoke('synctex:forward', synctexPath, texFile, line),
+    reverse: (synctexPath: string, page: number, h: number, v: number) =>
+      ipcRenderer.invoke('synctex:reverse', synctexPath, page, h, v),
+  },
 })
