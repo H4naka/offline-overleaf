@@ -14,9 +14,14 @@ interface Props {
   status: 'idle' | 'compiling' | 'success' | 'error'
   errors: string[]
   log: string
+  diagnostics?: LatexDiagnostic[]
   synctexPath?: string
   forwardTarget?: SyncForwardTarget
   onReverseSearch?: (file: string, line: number) => void
+}
+
+function fileBasename(p: string): string {
+  return p.replace(/.*[/\\]/, '') || p
 }
 
 // ── Per-page highlight geometry (CSS pixels at current scale) ─────────────────
@@ -141,7 +146,7 @@ function PdfPage({ doc, pageNum, scale, highlight, onDblClick }: {
 // ── Main PdfViewer ────────────────────────────────────────────────────────────
 export function PdfViewer({
   pdfPath, compileVersion, status, errors, log,
-  synctexPath, forwardTarget, onReverseSearch,
+  diagnostics = [], synctexPath, forwardTarget, onReverseSearch,
 }: Props) {
   const [pdfDoc,   setPdfDoc]   = useState<PDFDocumentProxy | null>(null)
   const [numPages, setNumPages] = useState(0)
@@ -188,7 +193,9 @@ export function PdfViewer({
     if (result.ok && result.data) onReverseSearch(result.data.file, result.data.line)
   }, [synctexPath, scale, onReverseSearch])
 
-  const hasErrors = status === 'error' && errors.length > 0
+  const errCount  = diagnostics.filter(d => d.severity === 'error').length
+  const warnCount = diagnostics.filter(d => d.severity === 'warning').length
+  const showPanel = diagnostics.length > 0 || (!!log && status !== 'idle')
 
   return (
     <div className={styles.root}>
@@ -244,21 +251,55 @@ export function PdfViewer({
         })}
       </div>
 
-      {/* ── compile log panel ── */}
-      {(hasErrors || (log && status !== 'idle')) && (
+      {/* ── diagnostics + log panel ── */}
+      {showPanel && (
         <div className={styles.logPanel}>
+          {/* Toggle header — shows error/warning counts */}
           <button className={styles.logToggle} onClick={() => setLogOpen(o => !o)}>
             <span className={styles.chevron}>{logOpen ? '▼' : '▶'}</span>
-            {hasErrors
-              ? <span className={styles.errorLabel}>{errors.length} error{errors.length !== 1 ? 's' : ''}</span>
-              : <span>Compile log</span>}
+            {errCount  > 0 && (
+              <span className={styles.errorLabel}>
+                {errCount} error{errCount !== 1 ? 's' : ''}
+              </span>
+            )}
+            {warnCount > 0 && (
+              <span className={styles.warnLabel}>
+                {warnCount} warning{warnCount !== 1 ? 's' : ''}
+              </span>
+            )}
+            {errCount === 0 && warnCount === 0 && (
+              <span>Compile log</span>
+            )}
           </button>
+
           {logOpen && (
             <div className={styles.logContent}>
-              {hasErrors && errors.map((err, i) => (
-                <div key={i} className={styles.errorLine}>{err}</div>
-              ))}
-              <pre className={styles.logPre}>{log}</pre>
+              {/* Structured diagnostic list */}
+              {diagnostics.length > 0 && (
+                <div className={styles.diagList}>
+                  {diagnostics.map((d, idx) => (
+                    <button
+                      key={idx}
+                      className={`${styles.diagItem} ${
+                        d.severity === 'error' ? styles.diagItemError : styles.diagItemWarn
+                      }`}
+                      onClick={() => d.line > 0 && onReverseSearch?.(d.file, d.line)}
+                      title={d.line > 0 ? 'Click to jump to this location' : undefined}
+                    >
+                      <span className={styles.diagIcon}>
+                        {d.severity === 'error' ? '●' : '△'}
+                      </span>
+                      <span className={styles.diagLoc}>
+                        {fileBasename(d.file)}{d.line > 0 ? `:${d.line}` : ''}
+                      </span>
+                      <span className={styles.diagMsg}>{d.message}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Raw log — always available for debugging */}
+              {log && <pre className={styles.logPre}>{log}</pre>}
             </div>
           )}
         </div>

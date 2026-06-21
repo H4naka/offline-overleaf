@@ -4,6 +4,8 @@ import { EditorSelection, EditorState, StateField, StateEffect } from '@codemirr
 import { Decoration, type DecorationSet } from '@codemirror/view'
 import { StreamLanguage } from '@codemirror/language'
 import { stex } from '@codemirror/legacy-modes/mode/stex'
+import { linter, lintGutter, forceLinting } from '@codemirror/lint'
+import type { Diagnostic as CMDiagnostic } from '@codemirror/lint'
 import styles from './Editor.module.css'
 
 export interface ViewState {
@@ -23,6 +25,7 @@ interface Props {
   value: string
   onChange: (value: string) => void
   onForwardSearch?: () => void
+  diagnostics?: LatexDiagnostic[]  // pre-filtered for this file; drives lint markers
 }
 
 const latexLang = StreamLanguage.define(stex)
@@ -106,7 +109,7 @@ const theme = EditorView.theme(
 )
 
 export const Editor = forwardRef<EditorHandle, Props>(function Editor(
-  { value, onChange, onForwardSearch },
+  { value, onChange, onForwardSearch, diagnostics },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -117,6 +120,44 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
   onForwardSearchRef.current = onForwardSearch
 
   const internalValueRef = useRef(value)
+
+  // ── Lint (inline error / warning markers) ──────────────────────────────────
+  // Diagnostics come from the LaTeX compile result, pre-filtered to this file.
+  // We store them in a ref so the linter function always reads the latest set
+  // without needing to recreate the extension when the prop changes.
+  const latexDiagsRef = useRef<LatexDiagnostic[]>([])
+
+  // Convert LatexDiagnostic (line number) → CM6 Diagnostic (char offsets).
+  // Called by the linter each time CM6 decides to re-run lint (on doc change
+  // or when forceLinting() is called externally).
+  const lintExtension = useMemo(() => {
+    const source = (view: EditorView): CMDiagnostic[] =>
+      latexDiagsRef.current.flatMap(d => {
+        if (d.line < 1) return []
+        try {
+          const lineNum = Math.max(1, Math.min(d.line, view.state.doc.lines))
+          const lineObj = view.state.doc.line(lineNum)
+          return [{
+            from:     lineObj.from,
+            to:       lineObj.to || lineObj.from + 1,
+            severity: d.severity,
+            message:  d.message,
+            source:   'LaTeX',
+          } satisfies CMDiagnostic]
+        } catch { return [] }
+      })
+    return [
+      linter(source, { delay: 750, autoPanel: false }),
+      lintGutter(),
+    ]
+  }, [])
+
+  // Sync diagnostics prop → ref, then trigger an immediate lint re-run.
+  useEffect(() => {
+    latexDiagsRef.current = diagnostics ?? []
+    const view = viewRef.current
+    if (view) forceLinting(view)
+  }, [diagnostics])
 
   // Double-click on editor → forward search. Created once; uses ref so it
   // always sees the latest callback without being recreated.
@@ -194,6 +235,7 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
           latexLang,
           theme,
           lineHighlightField,
+          lintExtension,
           dblClickExtension,
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {

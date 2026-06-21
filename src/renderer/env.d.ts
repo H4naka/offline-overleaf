@@ -7,12 +7,20 @@ interface FileEntry {
   children?: FileEntry[]
 }
 
+interface LatexDiagnostic {
+  file:     string   // absolute, normalised path
+  line:     number   // 1-based; 0 = line number unknown
+  severity: 'error' | 'warning'
+  message:  string
+}
+
 interface CompileResult {
   ok: boolean
   pdfPath?: string
   synctexPath?: string
   log: string
   errors: string[]
+  diagnostics: LatexDiagnostic[]
 }
 
 interface SyncForwardTarget {

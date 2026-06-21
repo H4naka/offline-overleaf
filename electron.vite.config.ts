@@ -27,6 +27,7 @@ export default defineConfig({
         '@codemirror/state',
         '@codemirror/view',
         '@codemirror/language',
+        '@codemirror/lint',
         '@codemirror/legacy-modes/mode/stex',
         'pdfjs-dist',
       ],

@@ -11,11 +11,17 @@ interface CompileState {
   log: string
   errors: string[]
   version: number
+  diagnostics: LatexDiagnostic[]
 }
 
 // Derive dirname in the renderer (no Node path module available)
 function dirOf(p: string): string {
   return p.replace(/[/\\][^/\\]*$/, '')
+}
+
+// Case-insensitive path comparison that handles mixed separators on Windows
+function normPath(p: string): string {
+  return p.toLowerCase().replace(/\\/g, '/')
 }
 
 export function App() {
@@ -26,7 +32,7 @@ export function App() {
   const [openFileContent, setOpenFileContent] = useState('')
   const [mainTexFile,     setMainTexFile]     = useState<string | null>(null)
   const [compile,         setCompile]         = useState<CompileState>({
-    status: 'idle', log: '', errors: [], version: 0,
+    status: 'idle', log: '', errors: [], version: 0, diagnostics: [],
   })
 
   // Always-current refs so stable callbacks read the latest values without deps
@@ -161,7 +167,7 @@ export function App() {
     setRootDir(dir)
     setOpenFilePath(fileToOpen)
     setOpenFileContent(contentToShow)
-    setCompile({ status: 'idle', log: '', errors: [], version: 0 })
+    setCompile({ status: 'idle', log: '', errors: [], version: 0, diagnostics: [] })
     if (entriesResult.ok) setEntries(entriesResult.data)
     setMainTexFile(storedMain)
   }, [])
@@ -350,7 +356,8 @@ export function App() {
       }
     }
 
-    setCompile(prev => ({ ...prev, status: 'compiling' }))
+    // Clear diagnostics immediately so stale markers don't linger during compile
+    setCompile(prev => ({ ...prev, status: 'compiling', diagnostics: [] }))
     const result = await window.api.compiler.compile(target)
     synctexPathRef.current = result.synctexPath ?? null
     setCompile(prev => ({
@@ -359,6 +366,7 @@ export function App() {
       log: result.log,
       errors: result.errors,
       version: prev.version + 1,
+      diagnostics: result.diagnostics,
     }))
   }, [])
 
@@ -401,6 +409,9 @@ export function App() {
               value={openFileContent}
               onChange={handleContentChange}
               onForwardSearch={handleForwardSearch}
+              diagnostics={compile.diagnostics.filter(
+                d => d.line > 0 && normPath(d.file) === normPath(openFilePath),
+              )}
             />
           ) : (
             <div className={styles.editorEmpty}>
@@ -422,6 +433,7 @@ export function App() {
             status={compile.status}
             errors={compile.errors}
             log={compile.log}
+            diagnostics={compile.diagnostics}
             synctexPath={synctexPathRef.current ?? undefined}
             forwardTarget={forwardTarget ?? undefined}
             onReverseSearch={handleReverseSearch}

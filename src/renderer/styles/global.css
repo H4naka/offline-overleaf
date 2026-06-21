@@ -13,6 +13,7 @@
   --color-text-muted:  #6c7086;
   --color-accent:      #89b4fa;
   --color-error:       #f38ba8;
+  --color-warning:     #f9e2af;
   --color-success:     #a6e3a1;
   --font-ui:   system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
